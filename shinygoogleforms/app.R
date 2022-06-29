@@ -1,6 +1,14 @@
 library(shiny)
 library(httr)
 library(glue)
+library(shinymanager)
+
+
+credentials <- data.frame(
+    user = c("Ilya", "Tata"), 
+    password = c("54321", "12345"), 
+  stringsAsFactors = FALSE
+)
 
 ui <- fluidPage(
     
@@ -26,10 +34,19 @@ ui <- fluidPage(
     )
 )
 )
+ui <- secure_app(ui)
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+    res_auth <- secure_server(
+        check_credentials = check_credentials(credentials)
+    )
+    
+    output$auth_output <- renderPrint({
+        reactiveValuesToList(res_auth)
+    })
     observeEvent(input$submit,  {
+        user <- URLencode(res_auth$user)
         prod <- URLencode(input$prod)
         weight <- URLencode(as.character(input$weight))
         calories <- URLencode(as.character(input$calories))
@@ -38,7 +55,6 @@ server <- function(input, output) {
         proteins <- URLencode(as.character(input$proteins))
         calories <- URLencode(as.character(input$calories))
         url <- glue("https://docs.google.com/forms/d/e/1FAIpQLScRvvI14N1wfb06f0bpiQ4mY65GpfpgAf6iZ47SyO7m-8L6-w/formResponse?usp=pp_url&entry.2136202261={prod}&entry.1081510207={weight}&entry.1407652810={proteins}&entry.1079127786={fats}&entry.489852779=aefds&entry.1285733439={sugars}")
-        print(url)
         res <- POST(
             url = url)
     }
