@@ -39,7 +39,6 @@ ui <- fluidPage(
 )
 ui <- secure_app(ui)
 
-# Define server logic required to draw a histogram
 server <- function(input, output) {
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
@@ -49,7 +48,10 @@ server <- function(input, output) {
         reactiveValuesToList(res_auth)
     })
     gs4_deauth()
-    data <- read_sheet("1Ak6QV96Nbnz7siJOUpjuvAEhWcoUmWZGpCYB_QWN9UU")
+    data <- read_sheet("1Ak6QV96Nbnz7siJOUpjuvAEhWcoUmWZGpCYB_QWN9UU", 
+                       col_types = "Tcnnnnnc") %>% 
+      mutate(Timestamp = as.Date(Timestamp)) %>% 
+      filter(User ==  res_auth$user)
     output$data <- renderTable(data)
     observeEvent(input$submit,  {
         user <- URLencode(res_auth$user)
@@ -60,7 +62,7 @@ server <- function(input, output) {
         sugars <- URLencode(as.character(input$sugars))
         proteins <- URLencode(as.character(input$proteins))
         calories <- URLencode(as.character(input$calories))
-        url <- glue("https://docs.google.com/forms/d/e/1FAIpQLScRvvI14N1wfb06f0bpiQ4mY65GpfpgAf6iZ47SyO7m-8L6-w/formResponse?usp=pp_url&entry.2136202261={prod}&entry.1081510207={weight}&entry.1407652810={proteins}&entry.1079127786={fats}&entry.489852779=aefds&entry.1285733439={sugars}&entry.1278145968={user}")
+        url <- glue("https://docs.google.com/forms/d/e/1FAIpQLScRvvI14N1wfb06f0bpiQ4mY65GpfpgAf6iZ47SyO7m-8L6-w/formResponse?usp=pp_url&entry.2136202261={prod}&entry.1081510207={weight}&entry.1407652810={proteins}&entry.1079127786={fats}&entry.489852779={sugars}&entry.1285733439={calories}&entry.1278145968={user}")
         res <- POST(
             url = url)
     }
