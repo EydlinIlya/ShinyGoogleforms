@@ -2,6 +2,8 @@ library(shiny)
 library(httr)
 library(glue)
 library(shinymanager)
+library(googlesheets4)
+library(dplyr)
 
 
 credentials <- data.frame(
@@ -30,6 +32,7 @@ ui <- fluidPage(
         
         # Show a plot 
         mainPanel(
+          tableOutput('data')
            
     )
 )
@@ -45,6 +48,9 @@ server <- function(input, output) {
     output$auth_output <- renderPrint({
         reactiveValuesToList(res_auth)
     })
+    gs4_deauth()
+    data <- read_sheet("1Ak6QV96Nbnz7siJOUpjuvAEhWcoUmWZGpCYB_QWN9UU")
+    output$data <- renderTable(data)
     observeEvent(input$submit,  {
         user <- URLencode(res_auth$user)
         prod <- URLencode(input$prod)
@@ -54,7 +60,7 @@ server <- function(input, output) {
         sugars <- URLencode(as.character(input$sugars))
         proteins <- URLencode(as.character(input$proteins))
         calories <- URLencode(as.character(input$calories))
-        url <- glue("https://docs.google.com/forms/d/e/1FAIpQLScRvvI14N1wfb06f0bpiQ4mY65GpfpgAf6iZ47SyO7m-8L6-w/formResponse?usp=pp_url&entry.2136202261={prod}&entry.1081510207={weight}&entry.1407652810={proteins}&entry.1079127786={fats}&entry.489852779=aefds&entry.1285733439={sugars}")
+        url <- glue("https://docs.google.com/forms/d/e/1FAIpQLScRvvI14N1wfb06f0bpiQ4mY65GpfpgAf6iZ47SyO7m-8L6-w/formResponse?usp=pp_url&entry.2136202261={prod}&entry.1081510207={weight}&entry.1407652810={proteins}&entry.1079127786={fats}&entry.489852779=aefds&entry.1285733439={sugars}&entry.1278145968={user}")
         res <- POST(
             url = url)
     }
