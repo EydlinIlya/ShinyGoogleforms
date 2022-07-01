@@ -5,6 +5,7 @@ library(shinymanager)
 library(googlesheets4)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
 
 credentials <- data.frame(
@@ -33,7 +34,7 @@ ui <- fluidPage(
         
         # Show a plot 
         mainPanel(
-          tableOutput('data')
+          plotOutput('data')
            
     )
 )
@@ -41,7 +42,7 @@ ui <- fluidPage(
 ui <- secure_app(ui)
 
 server <- function(input, output) {
-  autoInvalidate <- reactiveTimer(1000)
+  autoInvalidate <- reactiveTimer(3000)
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
     )
@@ -50,17 +51,23 @@ server <- function(input, output) {
         reactiveValuesToList(res_auth)
     })
     gs4_deauth()
+    
     observe({
-    autoInvalidate()  
+    autoInvalidate()
+      if(!is.null(res_auth$user)){
     data <- read_sheet("1Ak6QV96Nbnz7siJOUpjuvAEhWcoUmWZGpCYB_QWN9UU", 
                        col_types = "Tcnnnnnc") %>% 
       mutate(Timestamp = as.Date(Timestamp)) %>% 
-      dplyr::filter(User %in% res_auth$use)
+      dplyr::filter(User == res_auth$user)
+    
     cals <- data %>%
-      dplyr::filter(Sys.Date()-Timestamp <= 30) %>% 
       group_by(Timestamp)  %>% 
-      summarise(Calories = sum(Calories, na.rm = T))  
-    output$data <- renderTable(cals)})
+      summarise(Calories = sum(Calories*Weight/100, na.rm = T)) %>% 
+      replace_na(list(Calories=0))
+    p <- ggplot(cals, aes(x=Timestamp, y=Calories)) +
+      geom_point()
+    output$data <- renderPlot(p)}
+      })
     observeEvent(input$submit,  {
         user <- URLencode(res_auth$user)
         prod <- URLencode(input$prod)
