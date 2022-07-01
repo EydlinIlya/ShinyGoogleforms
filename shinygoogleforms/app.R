@@ -4,6 +4,7 @@ library(glue)
 library(shinymanager)
 library(googlesheets4)
 library(dplyr)
+library(tidyr)
 
 
 credentials <- data.frame(
@@ -40,6 +41,7 @@ ui <- fluidPage(
 ui <- secure_app(ui)
 
 server <- function(input, output) {
+  autoInvalidate <- reactiveTimer(1000)
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
     )
@@ -48,11 +50,17 @@ server <- function(input, output) {
         reactiveValuesToList(res_auth)
     })
     gs4_deauth()
+    observe({
+    autoInvalidate()  
     data <- read_sheet("1Ak6QV96Nbnz7siJOUpjuvAEhWcoUmWZGpCYB_QWN9UU", 
                        col_types = "Tcnnnnnc") %>% 
       mutate(Timestamp = as.Date(Timestamp)) %>% 
-      filter(User ==  res_auth$user)
-    output$data <- renderTable(data)
+      dplyr::filter(User %in% res_auth$use)
+    cals <- data %>%
+      dplyr::filter(Sys.Date()-Timestamp <= 30) %>% 
+      group_by(Timestamp)  %>% 
+      summarise(Calories = sum(Calories, na.rm = T))  
+    output$data <- renderTable(cals)})
     observeEvent(input$submit,  {
         user <- URLencode(res_auth$user)
         prod <- URLencode(input$prod)
