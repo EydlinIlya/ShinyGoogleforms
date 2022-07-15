@@ -4,7 +4,6 @@ library(glue)
 library(shinymanager)
 library(googlesheets4)
 library(dplyr)
-library(tidyr)
 library(ggplot2)
 
 
@@ -28,7 +27,8 @@ ui <- fluidPage(
         
         # Show a plot 
         mainPanel(
-            
+            plotOutput("p_col", click = "plot_click"),
+            plotOutput("p_line", click = "plot_click")
             
         )
     )
@@ -51,9 +51,28 @@ server <- function(input, output) {
         if(!is.null(res_auth$user)){
             data <- read_sheet("1tGW9iaYANpLduruY1f2m_WapwIwmx-QcSWw7fVjuYjY", 
                                col_types = "Tcn") %>% 
-                mutate(Timestamp = as.Date(Timestamp)) %>% 
-                dplyr::filter(user == res_auth$user) }
+                mutate(Date = as.Date(Timestamp)) %>% 
+                dplyr::filter(user == res_auth$user & (Date - Sys.Date()) <= 30) %>% 
+                group_by(Date) %>% 
+                summarise(ml = sum(ml, na.rm = T))
             
+            
+            p_col <- 
+                ggplot(data %>% dplyr::filter(Date == Sys.Date()), aes(x = Date, y = ml)) +
+                geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "grey") +
+                geom_col(width = 0.7, fill = "blue") +
+                theme_minimal() +
+                theme(panel.grid.major.x = element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank())
+            output$p_col <- renderPlot(p_col)
+            
+            p_line <- ggplot(data, aes(Date, ml)) +
+                geom_line(aes(y = ml), color = "blue") +
+                geom_point() +
+                theme_minimal()
+            output$p_line <- renderPlot(p_line)
+        }
+        
+           
            
     })
     observeEvent(input$submit,  {
