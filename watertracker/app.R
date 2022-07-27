@@ -39,7 +39,7 @@ server <- function(input, output) {
     #initialize sheet
     rv <- reactiveValues(sheet = NULL)
     # read google sheet every 3 seconds (fits for up to three users because of google api linitations)
-    autoInvalidate <- reactiveTimer(3000)
+    autoInvalidate <- reactiveTimer(10000)
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
     )
@@ -51,32 +51,44 @@ server <- function(input, output) {
     # dont ask for googlesheet auth
     gs4_deauth()
     
+    readsheet <- function(id, user) {
+        data <- read_sheet(id, 
+                           col_types = "Tcn") %>% 
+            mutate(Date = as.Date(Timestamp)) %>% 
+            dplyr::filter(user == user & (Date - Sys.Date()) <= 30) %>% 
+            group_by(Date) %>% 
+            summarise(ml = sum(ml, na.rm = T))
+        
+    }
+    plot1 <- function(data) {
+        p_col <- 
+            ggplot(data %>% dplyr::filter(Date == Sys.Date()), aes(x = Date, y = ml)) +
+            geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "grey") +
+            geom_col(width = 0.7, fill = "blue") +
+            theme_minimal() +
+            theme(panel.grid.major.x = element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank())
+    }
+    plot2 <- function(data) {
+        
+        p_line <- ggplot(data, aes(Date, ml)) +
+            geom_line(aes(y = ml), color = "blue") +
+            geom_point() +
+            theme_minimal()
+        
+    }
     
     observe({
         autoInvalidate()
+        
         if(!is.null(res_auth$user)){
-            data <- read_sheet("1tGW9iaYANpLduruY1f2m_WapwIwmx-QcSWw7fVjuYjY", 
-                               col_types = "Tcn") %>% 
-                mutate(Date = as.Date(Timestamp)) %>% 
-                dplyr::filter(user == res_auth$user & (Date - Sys.Date()) <= 30) %>% 
-                group_by(Date) %>% 
-                summarise(ml = sum(ml, na.rm = T))
-            print(sheet)
+    
+            data <- readsheet("1tGW9iaYANpLduruY1f2m_WapwIwmx-QcSWw7fVjuYjY", res_auth$user)
             #reload plots whenever data is changed
             if(is.null(rv$sheet) | !all(data == rv$sheet)) {
-                sheet$sheet <- data
-            p_col <- 
-                ggplot(data %>% dplyr::filter(Date == Sys.Date()), aes(x = Date, y = ml)) +
-                geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "grey") +
-                geom_col(width = 0.7, fill = "blue") +
-                theme_minimal() +
-                theme(panel.grid.major.x = element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank())
+                rv$sheet <- data
+            p_col <- plot1(data)
             output$p_col <- renderPlot(p_col)
-            
-            p_line <- ggplot(data, aes(Date, ml)) +
-                geom_line(aes(y = ml), color = "blue") +
-                geom_point() +
-                theme_minimal()
+            p_line <- plot2(data)
             output$p_line <- renderPlot(p_line)
         }}
         
@@ -89,6 +101,11 @@ server <- function(input, output) {
         url <- glue("https://docs.google.com/forms/d/e/1FAIpQLSfrl28Ujq-BLjPxlAzN1SwFDJvWfdhc2OL7uFSxSwY_F0SSow/formResponse?usp=pp_url&entry.1606266665={user}&entry.1695787879={water}")
         res <- POST(
             url = url)
+        rv$sheet <- readsheet("1tGW9iaYANpLduruY1f2m_WapwIwmx-QcSWw7fVjuYjY", res_auth$user)
+        p_col <- plot1(rv$sheet)
+        output$p_col <- renderPlot(p_col)
+        p_line <- plot2(rv$sheet)
+        output$p_line <- renderPlot(p_line)
     }
     )
 }
