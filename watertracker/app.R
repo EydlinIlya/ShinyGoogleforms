@@ -5,6 +5,9 @@ library(shinymanager)
 library(googlesheets4)
 library(dplyr)
 library(ggplot2)
+library(shinydashboard)
+library(ggthemes)
+library(extrafont)
 
 # creds for shinymanager
 credentials <- data.frame(
@@ -13,32 +16,31 @@ credentials <- data.frame(
     stringsAsFactors = FALSE
 )
 
-ui <- fluidPage(
-    
-    # Application title
-    titlePanel("Shiny with Googleforms water tracker"),
-    
-    # Sidebar with input widgets
-    sidebarLayout(
-        sidebarPanel(
-            numericInput("water", "Add water (ml)", 0, min = 0, step = 1),
-            actionButton("submit", "Submit")
+ui <- dashboardPage(
+    dashboardHeader(title = "Water tracker"),
+    dashboardSidebar( numericInput("water", "Add water (ml)", 0, min = 0, step = 1),
+                      actionButton("submit", "Submit")),
+    dashboardBody(
+        # Boxes need to be put in a row (or column)
+        fluidRow(
+            box(title = "Today", plotOutput("p_col", click = "plot_click"), width = 4), 
+            box(title = "Last 30 days", plotOutput("p_line", click = "plot_click"), width = 8)
         ),
-        
-        # Show plots for today and for whole month 
-        mainPanel(
-            plotOutput("p_col", click = "plot_click"),
-            plotOutput("p_line", click = "plot_click")
-            
+        fluidRow(
+            box(
+                title = "About", width = 12, background = "light-blue",
+                "This is the demonstartion of the googlesheets working as a batabase for the tutorial"
+            )
         )
     )
-)
+) 
+
 ui <- secure_app(ui)
 
 server <- function(input, output) {
     #initialize sheet
     rv <- reactiveValues(sheet = NULL)
-    # read google sheet every 3 seconds (fits for up to three users because of google api linitations)
+    # read google sheet every 10 seconds (fits for up to three users because of google api linitations)
     autoInvalidate <- reactiveTimer(10000)
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
@@ -51,6 +53,7 @@ server <- function(input, output) {
     # dont ask for googlesheet auth
     gs4_deauth()
     
+    # read data from google sheet 
     readsheet <- function(id, user) {
         data <- read_sheet(id, 
                            col_types = "Tcn") %>% 
@@ -60,20 +63,22 @@ server <- function(input, output) {
             summarise(ml = sum(ml, na.rm = T))
         
     }
+    # plot col plot for current date
     plot1 <- function(data) {
         p_col <- 
             ggplot(data %>% dplyr::filter(Date == Sys.Date()), aes(x = Date, y = ml)) +
-            geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "grey") +
-            geom_col(width = 0.7, fill = "blue") +
-            theme_minimal() +
+            geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "#1A1A1A") +
+            geom_col(width = 0.7, fill = "#2E45B8") +
+            theme_economist() +
             theme(panel.grid.major.x = element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank())
     }
+    # plot line chart for 30 days
     plot2 <- function(data) {
         
         p_line <- ggplot(data, aes(Date, ml)) +
-            geom_line(aes(y = ml), color = "blue") +
+            geom_line(aes(y = ml), colour =  "#2E45B8") +
             geom_point() +
-            theme_minimal()
+            theme_economist()
         
     }
     
@@ -90,7 +95,8 @@ server <- function(input, output) {
             output$p_col <- renderPlot(p_col)
             p_line <- plot2(data)
             output$p_line <- renderPlot(p_line)
-        }}
+            }
+            }
         
         
         
