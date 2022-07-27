@@ -6,7 +6,7 @@ library(googlesheets4)
 library(dplyr)
 library(ggplot2)
 
-
+# creds for shinymanager
 credentials <- data.frame(
     user = c("Ilya", "Tata"), 
     password = c("54321", "12345"), 
@@ -18,14 +18,14 @@ ui <- fluidPage(
     # Application title
     titlePanel("Shiny with Googleforms water tracker"),
     
-    # Sidebar with a slider input widget
+    # Sidebar with input widgets
     sidebarLayout(
         sidebarPanel(
             numericInput("water", "Add water (ml)", 0, min = 0, step = 1),
             actionButton("submit", "Submit")
         ),
         
-        # Show a plot 
+        # Show plots for today and for whole month 
         mainPanel(
             plotOutput("p_col", click = "plot_click"),
             plotOutput("p_line", click = "plot_click")
@@ -36,6 +36,7 @@ ui <- fluidPage(
 ui <- secure_app(ui)
 
 server <- function(input, output) {
+    # read google sheet every 3 seconds (fits for up to three users because of google api linitations)
     autoInvalidate <- reactiveTimer(3000)
     res_auth <- secure_server(
         check_credentials = check_credentials(credentials)
@@ -44,7 +45,10 @@ server <- function(input, output) {
     output$auth_output <- renderPrint({
         reactiveValuesToList(res_auth)
     })
+    
+    # dont ask for googlesheet auth
     gs4_deauth()
+    
     
     observe({
         autoInvalidate()
@@ -72,12 +76,10 @@ server <- function(input, output) {
             output$p_line <- renderPlot(p_line)
         }
         
-           
-           
+        
+        
     })
     observeEvent(input$submit,  {
-        print(res_auth$user)
-        print(input$water)
         user <- URLencode(res_auth$user)
         water <- URLencode(as.character(input$water))
         url <- glue("https://docs.google.com/forms/d/e/1FAIpQLSfrl28Ujq-BLjPxlAzN1SwFDJvWfdhc2OL7uFSxSwY_F0SSow/formResponse?usp=pp_url&entry.1606266665={user}&entry.1695787879={water}")
