@@ -36,6 +36,8 @@ ui <- fluidPage(
 ui <- secure_app(ui)
 
 server <- function(input, output) {
+    #initialize sheet
+    rv <- reactiveValues(sheet = NULL)
     # read google sheet every 3 seconds (fits for up to three users because of google api linitations)
     autoInvalidate <- reactiveTimer(3000)
     res_auth <- secure_server(
@@ -59,8 +61,10 @@ server <- function(input, output) {
                 dplyr::filter(user == res_auth$user & (Date - Sys.Date()) <= 30) %>% 
                 group_by(Date) %>% 
                 summarise(ml = sum(ml, na.rm = T))
-            
-            
+            print(sheet)
+            #reload plots whenever data is changed
+            if(is.null(rv$sheet) | !all(data == rv$sheet)) {
+                sheet$sheet <- data
             p_col <- 
                 ggplot(data %>% dplyr::filter(Date == Sys.Date()), aes(x = Date, y = ml)) +
                 geom_col(data = data.frame(Date = Sys.Date(), ml = 2000), aes(y = ml), fill = "grey") +
@@ -74,7 +78,7 @@ server <- function(input, output) {
                 geom_point() +
                 theme_minimal()
             output$p_line <- renderPlot(p_line)
-        }
+        }}
         
         
         
